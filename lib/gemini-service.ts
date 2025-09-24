@@ -11,17 +11,36 @@ export class GeminiCarSearchService {
       throw new Error('GEMINI_API_KEY não encontrada nas variáveis de ambiente');
     }
     
+    console.log('Inicializando Gemini com API Key:', apiKey.substring(0, 10) + '...');
+    
     this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-pro' });
+    this.model = this.genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        temperature: 0.7,
+        topP: 0.8,
+        topK: 40,
+        maxOutputTokens: 1000,
+      }
+    });
   }
 
   async searchCars(query: string, cars: Car[]): Promise<SearchResult> {
     const prompt = this.createSearchPrompt(query, cars);
     
     try {
-      const result = await this.model.generateContent(prompt);
+      console.log('Enviando requisição para Gemini...');
+      const result = await this.model.generateContent({
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }]
+      });
+      
       const response = await result.response;
       const text = response.text();
+      console.log('Resposta do Gemini:', text.substring(0, 100) + '...');
       
       return this.parseGeminiResponse(text, cars);
     } catch (error) {
@@ -31,32 +50,19 @@ export class GeminiCarSearchService {
   }
 
   private createSearchPrompt(query: string, cars: Car[]): string {
-    return `
-Você é um consultor especialista em vendas de carros. Analise a consulta do usuário e encontre os melhores carros da base de dados.
+    return `Você é um consultor especialista em vendas de carros. Analise a consulta e retorne carros relevantes.
 
-BASE DE DADOS:
-${JSON.stringify(cars, null, 2)}
+BASE DE DADOS (${cars.length} carros):
+${cars.map((car, index) => `${index}: ${car.Name} ${car.Model} - R$ ${car.Price} - ${car.Location}`).join('\n')}
 
-CONSULTA DO USUÁRIO: "${query}"
+CONSULTA: "${query}"
 
-INSTRUÇÕES:
-1. Encontre carros que correspondam à consulta do usuário
-2. Se não houver correspondência exata, sugira alternativas próximas
-3. Considere: marca, modelo, preço, localização
-4. Seja conversacional e persuasivo
-5. Explique por que está sugerindo cada carro
-6. Se o preço for maior que o orçamento, justifique o valor
-7. Se a localização for diferente, sugira cidades próximas
-
-FORMATO DA RESPOSTA:
+Retorne apenas um JSON válido:
 {
-  "cars": [IDs dos carros recomendados],
-  "message": "Mensagem conversacional explicando as recomendações",
+  "cars": [0, 1, 2],
+  "message": "Mensagem amigável explicando as recomendações",
   "suggestions": ["Sugestão 1", "Sugestão 2"]
-}
-
-Retorne APENAS o JSON válido, sem texto adicional.
-`;
+}`;
   }
 
   private parseGeminiResponse(text: string, cars: Car[]): SearchResult {

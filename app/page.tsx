@@ -41,7 +41,7 @@ export default function Home() {
             
             <div className="flex items-center space-x-2 text-sm text-gray-600">
               <Sparkles className="h-4 w-4 text-yellow-500" />
-              <span>Powered by Gemini AI</span>
+              <span>Powered by Smart AI</span>
             </div>
           </div>
         </div>
